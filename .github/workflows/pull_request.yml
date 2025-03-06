@@ -45,38 +45,53 @@ jobs:
       with:
         # needs depth to run git log below
         fetch-depth: 50
+
+    - name: Fetch origin/main
+      # we need origin/main to have comparisons in Makefile work
+      run: |
+        git remote set-branches --add origin main
+        git fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin main
+
     - uses: actions/cache@v4
       id: cache
       with:
         path: ./build-cache
         key: taxonomies-${{ hashFiles('taxonomies/**') }}
         restore-keys: taxonomies-
+
     - name: build
       run: make build container=backend
+
     - name: push backend image as artifact
       uses: ishworkh/container-image-artifact-upload@v2.0.0
       with:
         image: "openfoodfacts-server/backend:dev"
+
     - name: Fetch origin/main
       # we need origin/main to have comparison linting work
       run: |
         git remote set-branches --add origin main
         git fetch --no-tags --prune --progress --no-recurse-submodules --depth=5 origin main
+
     - name: Restore taxonomies dates
       # here we first restore dates from git for taxonomies to avoid build them all
       # see https://stackoverflow.com/a/60984318/2886726
       run: |
         git ls-files taxonomies/ | xargs -I{} git log -1 --date=format:%Y%m%d%H%M.%S --format='touch -t %ad "{}"' "{}" | bash
+
     - name: Rebuild taxonomies for Open Food Facts (off)
       run: make DOCKER_LOCAL_DATA="$(pwd)" build_taxonomies GITHUB_TOKEN="${{ secrets.TAXONOMY_CACHE_GITHUB_TOKEN }}"
+
     - name: Rebuild taxonomies for Open Beauty Facts (obf)
       run: |
         source env/setenv.sh obf
         make DOCKER_LOCAL_DATA="$(pwd)" build_taxonomies GITHUB_TOKEN="${{ secrets.TAXONOMY_CACHE_GITHUB_TOKEN }}"
+
     - name: Rebuild taxonomies for Open Products Facts (opf)
       run: |
         source env/setenv.sh opf
         make DOCKER_LOCAL_DATA="$(pwd)" build_taxonomies GITHUB_TOKEN="${{ secrets.TAXONOMY_CACHE_GITHUB_TOKEN }}"
+
     - name: Rebuild taxonomies for Open Pet Food Facts (opff)
       run: |
         source env/setenv.sh opff
